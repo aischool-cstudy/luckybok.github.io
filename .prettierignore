@@ -1,0 +1,22 @@
+# Dependencies
+node_modules
+
+# Build outputs
+.next
+out
+build
+dist
+coverage
+
+# Generated files
+*.generated.*
+src/types/database.types.ts
+
+# Config files
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Other
+.git
+.env*
