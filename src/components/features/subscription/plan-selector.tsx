@@ -5,9 +5,10 @@
  */
 
 import { useState } from 'react';
+import { Sparkles } from 'lucide-react';
 import { PricingCard } from '@/components/features/payment/pricing-card';
-import { Switch } from '@/components/ui/switch';
-import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 import { plans } from '@/config/pricing';
 import type { PlanType, BillingCycle } from '@/types/payment.types';
 
@@ -38,28 +39,53 @@ export function PlanSelector({
 
   return (
     <div className="space-y-8">
-      {/* 결제 주기 토글 */}
-      <div className="flex items-center justify-center gap-4">
-        <Label
-          htmlFor="billing-cycle"
-          className={billingCycle === 'monthly' ? 'text-foreground' : 'text-muted-foreground'}
-        >
-          월간 결제
-        </Label>
-        <Switch
-          id="billing-cycle"
-          checked={billingCycle === 'yearly'}
-          onCheckedChange={(checked: boolean) =>
-            setBillingCycle(checked ? 'yearly' : 'monthly')
-          }
-        />
-        <Label
-          htmlFor="billing-cycle"
-          className={billingCycle === 'yearly' ? 'text-foreground' : 'text-muted-foreground'}
-        >
-          연간 결제
-          <span className="ml-1 text-xs text-primary">(17% 할인)</span>
-        </Label>
+      {/* 할인 배너 */}
+      <div className="flex justify-center">
+        <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-full text-sm font-medium">
+          <Sparkles className="h-4 w-4" />
+          연간 결제 시 17% 할인 (2개월 무료)
+        </div>
+      </div>
+
+      {/* 결제 주기 토글 - 버튼 그룹 */}
+      <div className="flex justify-center">
+        <div className="inline-flex items-center bg-muted p-1 rounded-lg">
+          <button
+            type="button"
+            onClick={() => setBillingCycle('monthly')}
+            className={cn(
+              'px-4 py-2 rounded-md text-sm font-medium transition-all duration-200',
+              billingCycle === 'monthly'
+                ? 'bg-background shadow-sm text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            월간 결제
+          </button>
+          <button
+            type="button"
+            onClick={() => setBillingCycle('yearly')}
+            className={cn(
+              'px-4 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center gap-2',
+              billingCycle === 'yearly'
+                ? 'bg-background shadow-sm text-foreground'
+                : 'text-muted-foreground hover:text-foreground'
+            )}
+          >
+            연간 결제
+            <Badge
+              variant="secondary"
+              className={cn(
+                'text-[10px] px-1.5 py-0',
+                billingCycle === 'yearly'
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-primary/20 text-primary'
+              )}
+            >
+              -17%
+            </Badge>
+          </button>
+        </div>
       </div>
 
       {/* 요금제 카드 */}
