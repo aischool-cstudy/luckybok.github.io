@@ -254,3 +254,52 @@ export interface CreditSummary {
   expiringCredits: number;
   expiringDate: Date | null;
 }
+
+// ────────────────────────────────────────────────────────────
+// 토스페이먼츠 SDK 타입
+// ────────────────────────────────────────────────────────────
+
+/**
+ * 토스페이먼츠 단건 결제 요청 옵션
+ */
+export interface TossPaymentRequestOptions {
+  amount: number;
+  orderId: string;
+  orderName: string;
+  customerKey: string;
+  successUrl: string;
+  failUrl: string;
+}
+
+/**
+ * 토스페이먼츠 빌링 인증 요청 옵션
+ */
+export interface TossBillingAuthOptions {
+  customerKey: string;
+  successUrl: string;
+  failUrl: string;
+}
+
+/**
+ * 토스페이먼츠 SDK 인스턴스
+ */
+export interface TossPaymentsInstance {
+  /** 단건 결제 요청 */
+  requestPayment(method: string, options: TossPaymentRequestOptions): Promise<void>;
+  /** 빌링키 발급 인증 요청 */
+  requestBillingAuth(method: string, options: TossBillingAuthOptions): Promise<void>;
+}
+
+/**
+ * 전역 Window에 주입되는 TossPayments 생성자
+ */
+export interface TossPaymentsConstructor {
+  (clientKey: string): TossPaymentsInstance;
+}
+
+// Window 인터페이스 확장을 위한 모듈 선언
+declare global {
+  interface Window {
+    TossPayments?: TossPaymentsConstructor;
+  }
+}

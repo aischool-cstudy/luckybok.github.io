@@ -13,29 +13,11 @@ import { CreditPackageCard } from '@/components/features/payment/credit-package-
 import { creditPackages } from '@/config/pricing';
 import { prepareCreditPurchase, getCreditBalance } from '@/actions/payment';
 import { useToast } from '@/hooks/use-toast';
-
-declare global {
-  interface Window {
-    TossPayments?: {
-      (clientKey: string): {
-        requestPayment(
-          method: string,
-          options: {
-            amount: number;
-            orderId: string;
-            orderName: string;
-            customerKey: string;
-            successUrl: string;
-            failUrl: string;
-          }
-        ): Promise<void>;
-      };
-    };
-  }
-}
+import { useTossPayments } from '@/hooks/use-toss-payments';
 
 export default function CreditPurchasePage() {
   const { toast } = useToast();
+  const { isReady: isTossReady, requestPayment, error: tossError } = useTossPayments();
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPackage, setSelectedPackage] = useState<string | null>(null);
   const [creditBalance, setCreditBalance] = useState<number>(0);
@@ -49,19 +31,29 @@ export default function CreditPurchasePage() {
       }
     };
     fetchBalance();
-
-    // 토스페이먼츠 SDK 로드
-    const script = document.createElement('script');
-    script.src = 'https://js.tosspayments.com/v1/payment';
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      document.body.removeChild(script);
-    };
   }, []);
 
+  // SDK 로드 에러 처리
+  useEffect(() => {
+    if (tossError) {
+      toast({
+        title: '오류',
+        description: tossError.message,
+        variant: 'destructive',
+      });
+    }
+  }, [tossError, toast]);
+
   const handlePurchase = async (packageId: string) => {
+    if (!isTossReady) {
+      toast({
+        title: '오류',
+        description: '결제 시스템을 불러오는 중입니다. 잠시 후 다시 시도해주세요.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     setIsLoading(true);
     setSelectedPackage(packageId);
 
@@ -80,30 +72,18 @@ export default function CreditPurchasePage() {
       const { orderId, amount, orderName, customerKey } = result.data;
 
       // 토스페이먼츠 결제 위젯 호출
-      const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
-      if (!clientKey || !window.TossPayments) {
-        toast({
-          title: '오류',
-          description: '결제 시스템을 불러오는 데 실패했습니다',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const tossPayments = window.TossPayments(clientKey);
-      await tossPayments.requestPayment('카드', {
+      await requestPayment({
         amount,
         orderId,
         orderName,
         customerKey,
         successUrl: `${window.location.origin}/payment/success?type=credit`,
-        failUrl: `${window.location.origin}/payment/fail`,
+        failUrl: `${window.location.origin}/payment/fail?type=credit`,
       });
     } catch (error) {
-      console.error('결제 오류:', error);
       toast({
         title: '오류',
-        description: '결제 처리 중 오류가 발생했습니다',
+        description: error instanceof Error ? error.message : '결제 처리 중 오류가 발생했습니다',
         variant: 'destructive',
       });
     } finally {

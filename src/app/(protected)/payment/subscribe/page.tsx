@@ -11,22 +11,12 @@ import { Button } from '@/components/ui/button';
 import { PlanSelector } from '@/components/features/subscription/plan-selector';
 import { prepareSubscription, getCurrentSubscription } from '@/actions/subscription';
 import { useToast } from '@/hooks/use-toast';
+import { useTossPayments } from '@/hooks/use-toss-payments';
 import type { PlanType, BillingCycle, SubscriptionSummary } from '@/types/payment.types';
-
-// TossPayments SDK 타입 선언 (전역 Window에 추가)
-interface TossPaymentsInstance {
-  requestBillingAuth(
-    method: string,
-    options: {
-      customerKey: string;
-      successUrl: string;
-      failUrl: string;
-    }
-  ): Promise<void>;
-}
 
 export default function SubscribePage() {
   const { toast } = useToast();
+  const { isReady: isTossReady, requestBillingAuth, error: tossError } = useTossPayments();
   const [isLoading, setIsLoading] = useState(false);
   const [currentSubscription, setCurrentSubscription] = useState<SubscriptionSummary | null>(null);
   const [currentPlan, setCurrentPlan] = useState<PlanType>('starter');
@@ -43,22 +33,30 @@ export default function SubscribePage() {
       }
     };
     fetchSubscription();
-
-    // 토스페이먼츠 SDK 로드
-    const script = document.createElement('script');
-    script.src = 'https://js.tosspayments.com/v1/payment';
-    script.async = true;
-    document.body.appendChild(script);
-
-    return () => {
-      if (document.body.contains(script)) {
-        document.body.removeChild(script);
-      }
-    };
   }, []);
+
+  // SDK 로드 에러 처리
+  useEffect(() => {
+    if (tossError) {
+      toast({
+        title: '오류',
+        description: tossError.message,
+        variant: 'destructive',
+      });
+    }
+  }, [tossError, toast]);
 
   const handleSelectPlan = async (plan: PlanType, billingCycle: BillingCycle) => {
     if (plan === 'starter') return;
+
+    if (!isTossReady) {
+      toast({
+        title: '오류',
+        description: '결제 시스템을 불러오는 중입니다. 잠시 후 다시 시도해주세요.',
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setIsLoading(true);
 
@@ -84,29 +82,15 @@ export default function SubscribePage() {
       successUrl.searchParams.set('billingCycle', selectedCycle);
 
       // 토스페이먼츠 빌링 인증 요청
-      const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
-      const TossPayments = (window as unknown as { TossPayments?: (key: string) => TossPaymentsInstance }).TossPayments;
-
-      if (!clientKey || !TossPayments) {
-        toast({
-          title: '오류',
-          description: '결제 시스템을 불러오는 데 실패했습니다',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      const tossPayments = TossPayments(clientKey);
-      await tossPayments.requestBillingAuth('카드', {
+      await requestBillingAuth({
         customerKey,
         successUrl: successUrl.toString(),
-        failUrl: `${window.location.origin}/payment/fail`,
+        failUrl: `${window.location.origin}/payment/fail?type=subscription`,
       });
     } catch (error) {
-      console.error('구독 오류:', error);
       toast({
         title: '오류',
-        description: '구독 처리 중 오류가 발생했습니다',
+        description: error instanceof Error ? error.message : '구독 처리 중 오류가 발생했습니다',
         variant: 'destructive',
       });
     } finally {
