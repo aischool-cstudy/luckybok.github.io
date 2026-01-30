@@ -12,9 +12,10 @@
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { XCircle, CreditCard, Coins } from 'lucide-react';
+import { XCircle, CreditCard, Coins, AlertTriangle, RefreshCw, Home, Loader2, HelpCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 // 결제 유형
 type PaymentType = 'subscription' | 'credit';
@@ -23,20 +24,26 @@ type PaymentType = 'subscription' | 'credit';
 const paymentTypeConfig: Record<PaymentType, {
   title: string;
   icon: typeof CreditCard;
+  iconColor: string;
+  bgColor: string;
   retryPath: string;
   retryLabel: string;
 }> = {
   subscription: {
     title: '구독 결제 실패',
     icon: CreditCard,
+    iconColor: 'text-blue-500',
+    bgColor: 'bg-blue-500/10',
     retryPath: '/payment/subscribe',
-    retryLabel: '구독 다시 시도',
+    retryLabel: '다시 시도하기',
   },
   credit: {
     title: '크레딧 결제 실패',
     icon: Coins,
+    iconColor: 'text-yellow-500',
+    bgColor: 'bg-yellow-500/10',
     retryPath: '/payment/credits',
-    retryLabel: '크레딧 구매 다시 시도',
+    retryLabel: '다시 시도하기',
   },
 };
 
@@ -102,17 +109,57 @@ function PaymentFailContent() {
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="relative mx-auto mb-4">
-            <XCircle className="h-16 w-16 text-destructive" />
-            <Icon className="h-6 w-6 absolute -bottom-1 -right-1 text-muted-foreground bg-background rounded-full p-0.5" />
+      <Card className="w-full max-w-md overflow-hidden">
+        {/* 상단 컬러 바 */}
+        <div className={cn(
+          'h-2',
+          isUserCanceled ? 'bg-muted-foreground' : 'bg-destructive'
+        )} />
+
+        <CardHeader className="text-center pt-8">
+          <div className="relative mx-auto mb-6">
+            {/* 배경 글로우 효과 */}
+            <div className={cn(
+              'absolute inset-0 blur-2xl opacity-30 -z-10 rounded-full',
+              isUserCanceled ? 'bg-muted-foreground' : 'bg-destructive'
+            )} />
+
+            {/* 메인 아이콘 */}
+            <div className={cn(
+              'w-20 h-20 rounded-full flex items-center justify-center',
+              isUserCanceled ? 'bg-muted' : 'bg-destructive/10'
+            )}>
+              {isUserCanceled ? (
+                <XCircle className="h-10 w-10 text-muted-foreground" />
+              ) : (
+                <AlertTriangle className="h-10 w-10 text-destructive" />
+              )}
+            </div>
+
+            {/* 결제 유형 뱃지 */}
+            <div className={cn(
+              'absolute -bottom-1 -right-1 w-8 h-8 rounded-full flex items-center justify-center',
+              config.bgColor
+            )}>
+              <Icon className={cn('h-4 w-4', config.iconColor)} />
+            </div>
           </div>
-          <CardTitle className="text-2xl">{config.title}</CardTitle>
+
+          <CardTitle className="text-2xl">
+            {isUserCanceled ? '결제가 취소되었습니다' : config.title}
+          </CardTitle>
         </CardHeader>
-        <CardContent className="text-center space-y-4">
-          <div>
-            <p className={isUserCanceled ? 'text-muted-foreground' : 'text-destructive font-medium'}>
+
+        <CardContent className="text-center space-y-6 pb-8">
+          {/* 에러 메시지 */}
+          <div className={cn(
+            'p-4 rounded-lg',
+            isUserCanceled ? 'bg-muted' : 'bg-destructive/5'
+          )}>
+            <p className={cn(
+              'font-medium',
+              isUserCanceled ? 'text-muted-foreground' : 'text-destructive'
+            )}>
               {errorMessage}
             </p>
             {additionalHelp && (
@@ -120,27 +167,42 @@ function PaymentFailContent() {
             )}
           </div>
 
+          {/* 에러 코드 */}
           {code && !isUserCanceled && (
-            <p className="text-xs text-muted-foreground">오류 코드: {code}</p>
+            <p className="text-xs text-muted-foreground font-mono bg-muted px-3 py-1 rounded inline-block">
+              오류 코드: {code}
+            </p>
           )}
 
-          <div className="space-y-2 pt-2">
-            <Button asChild className="w-full">
-              <Link href={config.retryPath}>{config.retryLabel}</Link>
+          {/* 버튼 */}
+          <div className="space-y-3 pt-2">
+            <Button asChild className="w-full gap-2" size="lg">
+              <Link href={config.retryPath}>
+                <RefreshCw className="h-4 w-4" />
+                {config.retryLabel}
+              </Link>
             </Button>
-            <Button asChild variant="outline" className="w-full">
-              <Link href="/dashboard">대시보드로 이동</Link>
+            <Button asChild variant="outline" className="w-full gap-2">
+              <Link href="/dashboard">
+                <Home className="h-4 w-4" />
+                대시보드로 이동
+              </Link>
             </Button>
-            {!isUserCanceled && (
-              <p className="text-xs text-muted-foreground pt-2">
+          </div>
+
+          {/* 고객센터 안내 */}
+          {!isUserCanceled && (
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground pt-2">
+              <HelpCircle className="h-4 w-4" />
+              <span>
                 문제가 계속되면{' '}
-                <Link href="/support" className="text-primary hover:underline">
+                <Link href="/support" className="text-primary hover:underline font-medium">
                   고객센터
                 </Link>
                 에 문의해주세요.
-              </p>
-            )}
-          </div>
+              </span>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
@@ -154,7 +216,8 @@ export default function PaymentFailPage() {
         fallback={
           <div className="min-h-[60vh] flex items-center justify-center">
             <Card className="w-full max-w-md">
-              <CardContent className="pt-6 text-center">
+              <CardContent className="pt-8 pb-8 text-center">
+                <Loader2 className="h-12 w-12 animate-spin mx-auto text-muted-foreground mb-4" />
                 <p className="text-lg font-medium">로딩 중...</p>
               </CardContent>
             </Card>

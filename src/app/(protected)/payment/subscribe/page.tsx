@@ -5,10 +5,13 @@
  */
 
 import { useState, useEffect } from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Crown, Calendar, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { PlanSelector } from '@/components/features/subscription/plan-selector';
+import { cn } from '@/lib/utils';
 import { prepareSubscription, getCurrentSubscription } from '@/actions/subscription';
 import { useToast } from '@/hooks/use-toast';
 import { useTossPayments } from '@/hooks/use-toss-payments';
@@ -116,16 +119,60 @@ export default function SubscribePage() {
 
       {/* 현재 구독 상태 */}
       {currentSubscription && (
-        <div className="mb-8 p-4 rounded-lg bg-muted">
-          <p className="text-sm">
-            현재 <strong>{currentSubscription.plan.toUpperCase()}</strong> 플랜을 사용 중입니다.
-            {currentSubscription.cancelAtPeriodEnd && (
-              <span className="text-destructive ml-2">
-                (취소 예정: {new Date(currentSubscription.currentPeriodEnd).toLocaleDateString('ko-KR')})
-              </span>
-            )}
-          </p>
-        </div>
+        <Card className={cn(
+          'mb-8 overflow-hidden',
+          currentSubscription.cancelAtPeriodEnd
+            ? 'border-orange-200 dark:border-orange-800'
+            : 'border-primary/20'
+        )}>
+          <div className={cn(
+            'h-1',
+            currentSubscription.cancelAtPeriodEnd
+              ? 'bg-orange-500'
+              : 'bg-gradient-to-r from-blue-500 to-purple-500'
+          )} />
+          <CardContent className="pt-4">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div className="flex items-center gap-3">
+                <div className={cn(
+                  'flex h-10 w-10 items-center justify-center rounded-full',
+                  currentSubscription.cancelAtPeriodEnd
+                    ? 'bg-orange-100 dark:bg-orange-900/30'
+                    : 'bg-primary/10'
+                )}>
+                  {currentSubscription.cancelAtPeriodEnd ? (
+                    <AlertCircle className="h-5 w-5 text-orange-500" />
+                  ) : (
+                    <Crown className="h-5 w-5 text-primary" />
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold">
+                      현재 {currentSubscription.plan.toUpperCase()} 플랜
+                    </span>
+                    <Badge variant={currentSubscription.cancelAtPeriodEnd ? 'outline' : 'default'} className={cn(
+                      currentSubscription.cancelAtPeriodEnd && 'border-orange-500 text-orange-500'
+                    )}>
+                      {currentSubscription.cancelAtPeriodEnd ? '취소 예정' : '활성'}
+                    </Badge>
+                  </div>
+                  {currentSubscription.cancelAtPeriodEnd && (
+                    <p className="text-sm text-muted-foreground mt-0.5">
+                      {new Date(currentSubscription.currentPeriodEnd).toLocaleDateString('ko-KR')}에 종료됩니다
+                    </p>
+                  )}
+                </div>
+              </div>
+              {!currentSubscription.cancelAtPeriodEnd && (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Calendar className="h-4 w-4" />
+                  다음 결제: {new Date(currentSubscription.currentPeriodEnd).toLocaleDateString('ko-KR')}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {/* 플랜 선택기 */}
