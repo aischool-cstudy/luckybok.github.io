@@ -109,82 +109,101 @@ function PaymentFailContent() {
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
-      <Card className="w-full max-w-md overflow-hidden">
+      <Card className="w-full max-w-md overflow-hidden shadow-xl">
         {/* 상단 컬러 바 */}
         <div className={cn(
           'h-2',
-          isUserCanceled ? 'bg-muted-foreground' : 'bg-destructive'
+          isUserCanceled
+            ? 'bg-gradient-to-r from-slate-400 to-slate-500'
+            : 'bg-gradient-to-r from-red-500 to-rose-500'
         )} />
 
-        <CardHeader className="text-center pt-8">
-          <div className="relative mx-auto mb-6">
+        <CardHeader className="text-center pt-10">
+          <div className="relative mx-auto mb-8">
             {/* 배경 글로우 효과 */}
             <div className={cn(
-              'absolute inset-0 blur-2xl opacity-30 -z-10 rounded-full',
-              isUserCanceled ? 'bg-muted-foreground' : 'bg-destructive'
+              'absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2',
+              'w-40 h-40 rounded-full blur-3xl opacity-15 -z-10',
+              isUserCanceled ? 'bg-slate-500' : 'bg-red-500'
             )} />
 
             {/* 메인 아이콘 */}
             <div className={cn(
-              'w-20 h-20 rounded-full flex items-center justify-center',
-              isUserCanceled ? 'bg-muted' : 'bg-destructive/10'
+              'w-24 h-24 rounded-2xl flex items-center justify-center',
+              isUserCanceled
+                ? 'bg-slate-100 dark:bg-slate-800'
+                : 'bg-red-100 dark:bg-red-900/30'
             )}>
               {isUserCanceled ? (
-                <XCircle className="h-10 w-10 text-muted-foreground" />
+                <XCircle className="h-12 w-12 text-slate-500" />
               ) : (
-                <AlertTriangle className="h-10 w-10 text-destructive" />
+                <AlertTriangle className="h-12 w-12 text-red-500" />
               )}
             </div>
 
             {/* 결제 유형 뱃지 */}
             <div className={cn(
-              'absolute -bottom-1 -right-1 w-8 h-8 rounded-full flex items-center justify-center',
-              config.bgColor
+              'absolute -bottom-2 -right-2 w-10 h-10 rounded-full flex items-center justify-center shadow-lg',
+              config.bgColor, 'border-2 border-background'
             )}>
-              <Icon className={cn('h-4 w-4', config.iconColor)} />
+              <Icon className={cn('h-5 w-5', config.iconColor)} />
             </div>
           </div>
 
-          <CardTitle className="text-2xl">
+          <CardTitle className="text-2xl font-bold">
             {isUserCanceled ? '결제가 취소되었습니다' : config.title}
           </CardTitle>
+          <p className="text-muted-foreground mt-2">
+            {isUserCanceled ? '언제든 다시 시도할 수 있어요' : '결제 과정에서 문제가 발생했습니다'}
+          </p>
         </CardHeader>
 
         <CardContent className="text-center space-y-6 pb-8">
           {/* 에러 메시지 */}
           <div className={cn(
-            'p-4 rounded-lg',
-            isUserCanceled ? 'bg-muted' : 'bg-destructive/5'
+            'p-5 rounded-xl border',
+            isUserCanceled
+              ? 'bg-slate-50 dark:bg-slate-900/50 border-slate-200 dark:border-slate-800'
+              : 'bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900'
           )}>
             <p className={cn(
               'font-medium',
-              isUserCanceled ? 'text-muted-foreground' : 'text-destructive'
+              isUserCanceled ? 'text-slate-600 dark:text-slate-400' : 'text-red-600 dark:text-red-400'
             )}>
               {errorMessage}
             </p>
             {additionalHelp && (
-              <p className="text-sm text-muted-foreground mt-2">{additionalHelp}</p>
+              <p className="text-sm text-muted-foreground mt-3 pt-3 border-t border-current/10">
+                {additionalHelp}
+              </p>
             )}
           </div>
 
           {/* 에러 코드 */}
           {code && !isUserCanceled && (
-            <p className="text-xs text-muted-foreground font-mono bg-muted px-3 py-1 rounded inline-block">
-              오류 코드: {code}
-            </p>
+            <div className="inline-flex items-center gap-2 text-xs text-muted-foreground bg-muted px-4 py-2 rounded-full">
+              <span className="font-mono">오류 코드: {code}</span>
+            </div>
           )}
 
           {/* 버튼 */}
           <div className="space-y-3 pt-2">
-            <Button asChild className="w-full gap-2" size="lg">
+            <Button
+              asChild
+              className={cn(
+                'w-full h-12 text-base font-semibold',
+                !isUserCanceled && 'bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 shadow-lg'
+              )}
+              size="lg"
+            >
               <Link href={config.retryPath}>
-                <RefreshCw className="h-4 w-4" />
+                <RefreshCw className="h-4 w-4 mr-2" />
                 {config.retryLabel}
               </Link>
             </Button>
-            <Button asChild variant="outline" className="w-full gap-2">
+            <Button asChild variant="outline" className="w-full h-11">
               <Link href="/dashboard">
-                <Home className="h-4 w-4" />
+                <Home className="h-4 w-4 mr-2" />
                 대시보드로 이동
               </Link>
             </Button>
@@ -192,14 +211,14 @@ function PaymentFailContent() {
 
           {/* 고객센터 안내 */}
           {!isUserCanceled && (
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground pt-2">
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground pt-4 border-t">
               <HelpCircle className="h-4 w-4" />
               <span>
                 문제가 계속되면{' '}
                 <Link href="/support" className="text-primary hover:underline font-medium">
                   고객센터
                 </Link>
-                에 문의해주세요.
+                에 문의해주세요
               </span>
             </div>
           )}
