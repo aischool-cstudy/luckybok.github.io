@@ -1,7 +1,14 @@
 'use server';
 
 import { createServerClient } from '@/lib/supabase/server';
-import type { CreditTransactionInsert } from '@/types/database.types';
+import { getAuthUser } from '@/lib/auth';
+import { parseRpcResult, type RpcResultBase } from '@/lib/supabase/helpers';
+import { logError } from '@/lib/logger';
+
+// RPC 결과 확장 타입
+interface CreditRpcResult extends RpcResultBase {
+  new_balance: number;
+}
 
 // ────────────────────────────────────────────────────────────
 // 타입 정의
@@ -34,9 +41,9 @@ export async function getCreditBalance(userId?: string): Promise<CreditBalance |
   // userId가 없으면 현재 로그인한 사용자 조회
   let targetUserId = userId;
   if (!targetUserId) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return null;
-    targetUserId = user.id;
+    const authResult = await getAuthUser();
+    if (!authResult) return null;
+    targetUserId = authResult.user.id;
   }
 
   // 프로필에서 크레딧 잔액 조회
@@ -68,7 +75,10 @@ export async function getCreditBalance(userId?: string): Promise<CreditBalance |
   let expiringDate: Date | null = null;
 
   if (expiringTransactions && expiringTransactions.length > 0) {
-    expiringCredits = expiringTransactions.reduce((sum, t) => sum + t.amount, 0);
+    expiringCredits = expiringTransactions.reduce(
+      (sum: number, t: { amount: number; expires_at: string | null }) => sum + t.amount,
+      0
+    );
     const firstExpiry = expiringTransactions[0]?.expires_at;
     expiringDate = firstExpiry ? new Date(firstExpiry) : null;
   }
@@ -90,10 +100,8 @@ export async function getCreditBalance(userId?: string): Promise<CreditBalance |
  * - 일일 횟수가 0이면 크레딧 사용 가능 여부 확인
  */
 export async function checkGenerationAvailability(): Promise<GenerationAvailability> {
-  const supabase = await createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
+  const authResult = await getAuthUser();
+  if (!authResult) {
     return {
       canGenerate: false,
       reason: '로그인이 필요합니다.',
@@ -102,6 +110,8 @@ export async function checkGenerationAvailability(): Promise<GenerationAvailabil
       useCredits: false,
     };
   }
+
+  const { user, supabase } = authResult;
 
   const { data: profile } = await supabase
     .from('profiles')
@@ -158,6 +168,7 @@ export async function checkGenerationAvailability(): Promise<GenerationAvailabil
 
 /**
  * 크레딧 사용 (차감)
+ * 원자적 RPC 함수를 사용하여 트랜잭션 기록과 잔액 업데이트를 단일 트랜잭션으로 처리
  * @param userId 사용자 ID
  * @param amount 사용할 크레딧 양 (양수)
  * @param description 사용 내역 설명
@@ -173,53 +184,28 @@ export async function useCredit(
 
   const supabase = await createServerClient();
 
-  // 현재 잔액 조회
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('credits_balance')
-    .eq('id', userId)
-    .single();
+  // 원자적 RPC 함수 호출
+  const { data: rpcResult, error: rpcError } = await supabase.rpc(
+    'use_credit_atomic',
+    {
+      p_user_id: userId,
+      p_amount: amount,
+      p_description: description,
+    }
+  );
 
-  if (!profile) {
-    return { success: false, error: '사용자를 찾을 수 없습니다.' };
+  if (rpcError) {
+    logError('크레딧 사용 RPC 오류', rpcError, { userId, action: 'useCredit' });
+    return { success: false, error: '크레딧 사용에 실패했습니다.' };
   }
 
-  if (profile.credits_balance < amount) {
-    return { success: false, error: '크레딧이 부족합니다.' };
+  // RPC 결과 확인
+  const parsed = parseRpcResult<CreditRpcResult>(rpcResult);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error };
   }
 
-  const newBalance = profile.credits_balance - amount;
-
-  // 트랜잭션 기록
-  const transaction: CreditTransactionInsert = {
-    user_id: userId,
-    type: 'usage',
-    amount: -amount, // 사용은 음수로 기록
-    balance: newBalance,
-    description,
-  };
-
-  const { error: transactionError } = await supabase
-    .from('credit_transactions')
-    .insert(transaction);
-
-  if (transactionError) {
-    console.error('크레딧 트랜잭션 기록 오류:', transactionError);
-    return { success: false, error: '크레딧 사용 기록에 실패했습니다.' };
-  }
-
-  // 잔액 업데이트
-  const { error: updateError } = await supabase
-    .from('profiles')
-    .update({ credits_balance: newBalance })
-    .eq('id', userId);
-
-  if (updateError) {
-    console.error('크레딧 잔액 업데이트 오류:', updateError);
-    return { success: false, error: '크레딧 잔액 업데이트에 실패했습니다.' };
-  }
-
-  return { success: true, newBalance };
+  return { success: true, newBalance: parsed.data.new_balance };
 }
 
 // ────────────────────────────────────────────────────────────
@@ -228,6 +214,7 @@ export async function useCredit(
 
 /**
  * 크레딧 추가 (충전/지급)
+ * 원자적 RPC 함수를 사용하여 트랜잭션 기록과 잔액 업데이트를 단일 트랜잭션으로 처리
  * @param userId 사용자 ID
  * @param amount 추가할 크레딧 양 (양수)
  * @param type 트랜잭션 타입
@@ -249,51 +236,31 @@ export async function addCredit(
 
   const supabase = await createServerClient();
 
-  // 현재 잔액 조회
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('credits_balance')
-    .eq('id', userId)
-    .single();
+  // 원자적 RPC 함수 호출
+  const { data: rpcResult, error: rpcError } = await supabase.rpc(
+    'add_credit_atomic',
+    {
+      p_user_id: userId,
+      p_amount: amount,
+      p_type: type,
+      p_description: description,
+      p_payment_id: paymentId,
+      p_expires_at: expiresAt?.toISOString(),
+    }
+  );
 
-  if (!profile) {
-    return { success: false, error: '사용자를 찾을 수 없습니다.' };
+  if (rpcError) {
+    logError('크레딧 추가 RPC 오류', rpcError, { userId, action: 'addCredit' });
+    return { success: false, error: '크레딧 추가에 실패했습니다.' };
   }
 
-  const newBalance = profile.credits_balance + amount;
-
-  // 트랜잭션 기록
-  const transaction: CreditTransactionInsert = {
-    user_id: userId,
-    type,
-    amount,
-    balance: newBalance,
-    description,
-    payment_id: paymentId || null,
-    expires_at: expiresAt?.toISOString() || null,
-  };
-
-  const { error: transactionError } = await supabase
-    .from('credit_transactions')
-    .insert(transaction);
-
-  if (transactionError) {
-    console.error('크레딧 트랜잭션 기록 오류:', transactionError);
-    return { success: false, error: '크레딧 추가 기록에 실패했습니다.' };
+  // RPC 결과 확인
+  const parsed = parseRpcResult<CreditRpcResult>(rpcResult);
+  if (!parsed.success) {
+    return { success: false, error: parsed.error };
   }
 
-  // 잔액 업데이트
-  const { error: updateError } = await supabase
-    .from('profiles')
-    .update({ credits_balance: newBalance })
-    .eq('id', userId);
-
-  if (updateError) {
-    console.error('크레딧 잔액 업데이트 오류:', updateError);
-    return { success: false, error: '크레딧 잔액 업데이트에 실패했습니다.' };
-  }
-
-  return { success: true, newBalance };
+  return { success: true, newBalance: parsed.data.new_balance };
 }
 
 // ────────────────────────────────────────────────────────────
@@ -304,13 +271,12 @@ export async function addCredit(
  * 크레딧 트랜잭션 히스토리 조회
  */
 export async function getCreditHistory(page = 1, limit = 10) {
-  const supabase = await createServerClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user) {
+  const authResult = await getAuthUser();
+  if (!authResult) {
     return { transactions: [], total: 0 };
   }
 
+  const { user, supabase } = authResult;
   const offset = (page - 1) * limit;
 
   const { data: transactions, error, count } = await supabase
@@ -321,7 +287,7 @@ export async function getCreditHistory(page = 1, limit = 10) {
     .range(offset, offset + limit - 1);
 
   if (error) {
-    console.error('크레딧 히스토리 조회 오류:', error);
+    logError('크레딧 히스토리 조회 오류', error, { userId: user.id, action: 'getCreditHistory' });
     return { transactions: [], total: 0 };
   }
 

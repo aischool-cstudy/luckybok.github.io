@@ -1,8 +1,9 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { createServerClient } from '@/lib/supabase/server';
+import { requireAuth, getAuthUser, AuthError } from '@/lib/auth';
 import type { GeneratedContent as GeneratedContentDB } from '@/types/database.types';
+import { logError } from '@/lib/logger';
 
 /**
  * 히스토리 필터 타입
@@ -23,27 +24,27 @@ export type HistoryItem = GeneratedContentDB;
 export async function getContentById(
   id: string
 ): Promise<{ success: true; data: HistoryItem } | { success: false; error: string }> {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const { user, supabase } = await requireAuth();
 
-  if (!user) {
-    return { success: false, error: '로그인이 필요합니다.' };
+    const { data, error } = await supabase
+      .from('generated_contents')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .single();
+
+    if (error || !data) {
+      return { success: false, error: '콘텐츠를 찾을 수 없습니다.' };
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return { success: false, error: error.message };
+    }
+    throw error;
   }
-
-  const { data, error } = await supabase
-    .from('generated_contents')
-    .select('*')
-    .eq('id', id)
-    .eq('user_id', user.id)
-    .single();
-
-  if (error || !data) {
-    return { success: false, error: '콘텐츠를 찾을 수 없습니다.' };
-  }
-
-  return { success: true, data };
 }
 
 /**
@@ -52,27 +53,27 @@ export async function getContentById(
 export async function deleteContent(
   id: string
 ): Promise<{ success: true } | { success: false; error: string }> {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  try {
+    const { user, supabase } = await requireAuth();
 
-  if (!user) {
-    return { success: false, error: '로그인이 필요합니다.' };
+    const { error } = await supabase
+      .from('generated_contents')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id);
+
+    if (error) {
+      return { success: false, error: '삭제에 실패했습니다.' };
+    }
+
+    revalidatePath('/history');
+    return { success: true };
+  } catch (error) {
+    if (error instanceof AuthError) {
+      return { success: false, error: error.message };
+    }
+    throw error;
   }
-
-  const { error } = await supabase
-    .from('generated_contents')
-    .delete()
-    .eq('id', id)
-    .eq('user_id', user.id);
-
-  if (error) {
-    return { success: false, error: '삭제에 실패했습니다.' };
-  }
-
-  revalidatePath('/history');
-  return { success: true };
 }
 
 /**
@@ -87,15 +88,12 @@ export async function getFilteredHistory(
   total: number;
   totalPages: number;
 }> {
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const authResult = await getAuthUser();
+  if (!authResult) {
     return { contents: [], total: 0, totalPages: 0 };
   }
 
+  const { user, supabase } = authResult;
   const offset = (page - 1) * limit;
 
   let query = supabase
@@ -116,7 +114,13 @@ export async function getFilteredHistory(
     .range(offset, offset + limit - 1);
 
   if (error) {
-    console.error('히스토리 조회 오류:', error);
+    logError('히스토리 조회 오류', error, {
+      action: 'getFilteredHistory',
+      userId: user.id,
+      page,
+      limit,
+      filters,
+    });
     return { contents: [], total: 0, totalPages: 0 };
   }
 

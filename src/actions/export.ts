@@ -1,11 +1,19 @@
 'use server';
 
 import { z } from 'zod';
-import { renderToBuffer } from '@react-pdf/renderer';
-import { createServerClient } from '@/lib/supabase/server';
+import { requireAuth, AuthError } from '@/lib/auth';
 import { parseContentJson } from '@/lib/history-utils';
-import { registerFonts, ContentTemplate } from '@/lib/pdf';
 import type { Plan } from '@/types/domain.types';
+import { logError } from '@/lib/logger';
+
+// PDF 라이브러리는 동적 import로 로드 (번들 최적화)
+async function loadPdfDependencies() {
+  const [{ renderToBuffer }, { registerFonts, ContentTemplate }] = await Promise.all([
+    import('@react-pdf/renderer'),
+    import('@/lib/pdf'),
+  ]);
+  return { renderToBuffer, registerFonts, ContentTemplate };
+}
 
 // 입력 스키마
 const exportContentInputSchema = z.object({
@@ -35,58 +43,54 @@ export async function exportContentToPDF(
 
   const { contentId } = parsed.data;
 
-  // 2. 인증 확인
-  const supabase = await createServerClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { success: false, error: '로그인이 필요합니다.' };
-  }
-
-  // 3. 프로필 조회 (플랜 체크용)
-  const { data: profile, error: profileError } = await supabase
-    .from('profiles')
-    .select('plan')
-    .eq('id', user.id)
-    .single();
-
-  if (profileError || !profile) {
-    return { success: false, error: '사용자 정보를 찾을 수 없습니다.' };
-  }
-
-  // 4. 플랜 체크
-  if (!ALLOWED_PLANS.includes(profile.plan)) {
-    return {
-      success: false,
-      error: 'PDF 내보내기는 Pro 플랜 이상에서 사용 가능합니다.',
-    };
-  }
-
-  // 5. 콘텐츠 조회
-  const { data: contentData, error: contentError } = await supabase
-    .from('generated_contents')
-    .select('*')
-    .eq('id', contentId)
-    .eq('user_id', user.id)
-    .single();
-
-  if (contentError || !contentData) {
-    return { success: false, error: '콘텐츠를 찾을 수 없습니다.' };
-  }
-
-  // 6. JSON 파싱
-  const parsedContent = parseContentJson(contentData.content);
-  if (!parsedContent) {
-    return { success: false, error: '콘텐츠 형식이 올바르지 않습니다.' };
-  }
-
   try {
-    // 7. 폰트 등록
+    // 2. 인증 확인
+    const { user, supabase } = await requireAuth();
+
+    // 3. 프로필 조회 (플랜 체크용)
+    const { data: profile, error: profileError } = await supabase
+      .from('profiles')
+      .select('plan')
+      .eq('id', user.id)
+      .single();
+
+    if (profileError || !profile) {
+      return { success: false, error: '사용자 정보를 찾을 수 없습니다.' };
+    }
+
+    // 4. 플랜 체크
+    if (!ALLOWED_PLANS.includes(profile.plan)) {
+      return {
+        success: false,
+        error: 'PDF 내보내기는 Pro 플랜 이상에서 사용 가능합니다.',
+      };
+    }
+
+    // 5. 콘텐츠 조회
+    const { data: contentData, error: contentError } = await supabase
+      .from('generated_contents')
+      .select('*')
+      .eq('id', contentId)
+      .eq('user_id', user.id)
+      .single();
+
+    if (contentError || !contentData) {
+      return { success: false, error: '콘텐츠를 찾을 수 없습니다.' };
+    }
+
+    // 6. JSON 파싱
+    const parsedContent = parseContentJson(contentData.content);
+    if (!parsedContent) {
+      return { success: false, error: '콘텐츠 형식이 올바르지 않습니다.' };
+    }
+
+    // 7. PDF 라이브러리 동적 로드 (번들 최적화)
+    const { renderToBuffer, registerFonts, ContentTemplate } = await loadPdfDependencies();
+
+    // 8. 폰트 등록
     registerFonts();
 
-    // 8. PDF 렌더링
+    // 9. PDF 렌더링
     const pdfBuffer = await renderToBuffer(
       ContentTemplate({
         content: parsedContent,
@@ -99,7 +103,7 @@ export async function exportContentToPDF(
       })
     );
 
-    // 9. 파일명 생성
+    // 10. 파일명 생성
     const sanitizedTitle = (parsedContent.title || contentData.topic)
       .replace(/[^a-zA-Z0-9가-힣\s]/g, '')
       .replace(/\s+/g, '_')
@@ -113,7 +117,13 @@ export async function exportContentToPDF(
       filename,
     };
   } catch (error) {
-    console.error('PDF 생성 오류:', error);
+    if (error instanceof AuthError) {
+      return { success: false, error: error.message };
+    }
+    logError('PDF 생성 오류', error, {
+      action: 'exportContentToPDF',
+      contentId,
+    });
     return { success: false, error: 'PDF 생성 중 오류가 발생했습니다.' };
   }
 }
