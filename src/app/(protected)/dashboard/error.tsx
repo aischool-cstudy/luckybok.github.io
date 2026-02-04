@@ -3,6 +3,7 @@
 import { useEffect } from 'react';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { AlertTriangle, RefreshCw, LogOut } from 'lucide-react';
+import { captureError } from '@/lib/client-logger';
 
 export default function DashboardError({
   error,
@@ -12,8 +13,11 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // 에러 로깅 (프로덕션에서는 Sentry 등으로 전송)
-    console.error('대시보드 페이지 에러:', error);
+    // Sentry로 에러 전송
+    captureError(error, {
+      component: 'DashboardPage',
+      action: 'load',
+    });
   }, [error]);
 
   return (
