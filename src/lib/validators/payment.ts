@@ -77,6 +77,25 @@ export const cancelSubscriptionSchema = z.object({
 });
 
 // ────────────────────────────────────────────────────────────
+// 플랜 변경 스키마
+// ────────────────────────────────────────────────────────────
+
+export const changePlanSchema = z.object({
+  newPlan: paidPlanSchema,
+  newBillingCycle: billingCycleSchema,
+});
+
+export const confirmPlanChangeSchema = z.object({
+  newPlan: paidPlanSchema,
+  newBillingCycle: billingCycleSchema,
+  orderId: z
+    .string()
+    .min(1, '주문 ID가 필요합니다')
+    .regex(/^CHG_\d{14}_[A-Z0-9]{8}$/, '잘못된 주문 ID 형식입니다')
+    .optional(),
+});
+
+// ────────────────────────────────────────────────────────────
 // 웹훅 스키마
 // ────────────────────────────────────────────────────────────
 
@@ -90,13 +109,21 @@ export const webhookEventTypeSchema = z.enum([
 export const webhookPayloadSchema = z.object({
   eventType: webhookEventTypeSchema,
   createdAt: z.string(),
-  data: z.object({
-    paymentKey: z.string().optional(),
-    orderId: z.string().optional(),
-    status: z.string().optional(),
-    transactionKey: z.string().optional(),
-    secret: z.string().optional(),
-  }).passthrough(),
+  data: z
+    .object({
+      paymentKey: z.string().optional(),
+      orderId: z.string().optional(),
+      status: z.string().optional(),
+      transactionKey: z.string().optional(),
+      secret: z.string().optional(),
+      // 토스페이먼츠 웹훅에서 전달되는 추가 필드들 (명시적 정의)
+      amount: z.number().optional(),
+      method: z.string().optional(),
+      approvedAt: z.string().optional(),
+      canceledAt: z.string().optional(),
+      requestedAt: z.string().optional(),
+    })
+    .strict(),
 });
 
 // ────────────────────────────────────────────────────────────
@@ -180,11 +207,11 @@ export function validateSubscriptionAmount(
  */
 export function validateOrderIdFormat(
   orderId: string,
-  expectedType?: 'ORD' | 'SUB' | 'CRD'
+  expectedType?: 'ORD' | 'SUB' | 'CRD' | 'CHG'
 ): boolean {
   const pattern = expectedType
     ? new RegExp(`^${expectedType}_\\d{14}_[A-Z0-9]{8}$`)
-    : /^(ORD|SUB|CRD)_\d{14}_[A-Z0-9]{8}$/;
+    : /^(ORD|SUB|CRD|CHG)_\d{14}_[A-Z0-9]{8}$/;
 
   return pattern.test(orderId);
 }
@@ -202,3 +229,24 @@ export type WebhookPayload = z.infer<typeof webhookPayloadSchema>;
 export type PaymentSuccessCallback = z.infer<typeof paymentSuccessCallbackSchema>;
 export type PaymentFailCallback = z.infer<typeof paymentFailCallbackSchema>;
 export type BillingSuccessCallback = z.infer<typeof billingSuccessCallbackSchema>;
+
+// ────────────────────────────────────────────────────────────
+// 환불 스키마
+// ────────────────────────────────────────────────────────────
+
+export const refundRequestSchema = z.object({
+  paymentId: z.string().uuid('잘못된 결제 ID 형식입니다'),
+  reason: z
+    .string()
+    .max(500, '환불 사유는 500자 이내로 입력해주세요')
+    .optional(),
+  refundAmount: z
+    .number()
+    .int('환불 금액은 정수여야 합니다')
+    .positive('환불 금액은 양수여야 합니다')
+    .optional(),
+});
+
+export type RefundRequestInput = z.infer<typeof refundRequestSchema>;
+export type ChangePlanInput = z.infer<typeof changePlanSchema>;
+export type ConfirmPlanChangeInput = z.infer<typeof confirmPlanChangeSchema>;

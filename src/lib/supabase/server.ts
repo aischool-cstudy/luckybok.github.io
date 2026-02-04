@@ -1,13 +1,18 @@
 import { createServerClient as createClient } from '@supabase/ssr';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import type { Database } from '@/types/database.types';
+import { serverEnv } from '@/lib/env';
 
-export async function createServerClient() {
+// 타입 별칭 - 명시적 타입 지정을 위해
+export type ServerClient = SupabaseClient<Database>;
+
+export async function createServerClient(): Promise<ServerClient> {
   const cookieStore = await cookies();
 
   return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    serverEnv.SUPABASE_URL,
+    serverEnv.SUPABASE_ANON_KEY,
     {
       cookies: {
         getAll() {

@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { logger } from '@/lib/logger';
 
 /**
  * Server Action 결과 타입
@@ -41,7 +42,7 @@ export function createSafeAction<TInput, TOutput>(
       const result = await handler(validation.data);
       return { success: true, data: result };
     } catch (error) {
-      console.error('Action Error:', error);
+      logger.error('Action Error', error, { action: 'safe-action' });
       return {
         success: false,
         error:

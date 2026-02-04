@@ -5,6 +5,57 @@
  * 다른 파일에서는 이 파일의 상수를 import하여 사용합니다.
  */
 
+// ===== 시간 관련 상수 =====
+
+/** 밀리초 단위 상수 */
+export const MS_PER_SECOND = 1000;
+export const MS_PER_MINUTE = 60 * MS_PER_SECOND;
+export const MS_PER_HOUR = 60 * MS_PER_MINUTE;
+export const MS_PER_DAY = 24 * MS_PER_HOUR;
+
+/** 일 단위 상수 */
+export const DAYS_IN_WEEK = 7;
+export const DAYS_IN_MONTH = 30; // 평균값
+export const DAYS_IN_YEAR = 365;
+
+/** 크레딧 만료 경고 기간 (30일) */
+export const CREDIT_EXPIRY_WARNING_DAYS = 30;
+
+/** 환불 가능 기간 (7일) */
+export const REFUND_ELIGIBLE_DAYS = 7;
+
+/** 결제 재시도 간격 (1일) */
+export const PAYMENT_RETRY_INTERVAL_DAYS = 1;
+
+/** 구독 유예 기간 (3일) */
+export const SUBSCRIPTION_GRACE_PERIOD_DAYS = 3;
+
+// ===== 타임아웃 설정 =====
+
+/** API 요청 타임아웃 (기본) */
+export const DEFAULT_TIMEOUT_MS = 15 * MS_PER_SECOND; // 15초
+
+/** AI API 타임아웃 (긴 응답 대기) */
+export const AI_TIMEOUT_MS = 60 * MS_PER_SECOND; // 60초
+
+/** 결제 API 타임아웃 */
+export const PAYMENT_TIMEOUT_MS = 15 * MS_PER_SECOND; // 15초
+
+/** 외부 API 재시도 설정 */
+export const RETRY_CONFIG = {
+  /** 최대 재시도 횟수 */
+  maxRetries: 3,
+  /** 기본 딜레이 (ms) */
+  baseDelayMs: MS_PER_SECOND,
+  /** 최대 딜레이 (ms) */
+  maxDelayMs: 10 * MS_PER_SECOND,
+  /** 재시도 가능한 HTTP 상태 코드 */
+  retryableStatusCodes: [408, 429, 500, 502, 503, 504],
+} as const;
+
+/** Cron Job 타임아웃 */
+export const CRON_TIMEOUT_MS = 5 * MS_PER_MINUTE; // 5분
+
 // ===== 지원 언어 =====
 // 우선순위: P0(python, javascript) → P1(sql, java) → P2(typescript, go)
 
@@ -94,3 +145,76 @@ export const TARGET_AUDIENCE_OPTIONS = TARGET_AUDIENCES.map((value) => ({
   value,
   label: TARGET_AUDIENCE_LABELS[value],
 }));
+
+// ===== 웹훅 상태 =====
+
+export const WEBHOOK_STATUSES = ['pending', 'processed', 'failed', 'retrying'] as const;
+
+export type WebhookStatus = (typeof WEBHOOK_STATUSES)[number];
+
+export const WEBHOOK_STATUS_LABELS: Record<WebhookStatus, string> = {
+  pending: '대기 중',
+  processed: '처리 완료',
+  failed: '실패',
+  retrying: '재시도 중',
+};
+
+// ===== 결제 및 구독 상태 =====
+
+export const PAYMENT_STATUSES = [
+  'pending',
+  'completed',
+  'failed',
+  'canceled',
+  'refunded',
+  'partial_refunded',
+] as const;
+
+export type PaymentStatusType = (typeof PAYMENT_STATUSES)[number];
+
+export const PAYMENT_STATUS_LABELS: Record<PaymentStatusType, string> = {
+  pending: '결제 대기',
+  completed: '결제 완료',
+  failed: '결제 실패',
+  canceled: '결제 취소',
+  refunded: '환불 완료',
+  partial_refunded: '부분 환불',
+};
+
+export const SUBSCRIPTION_STATUSES = [
+  'active',
+  'canceled',
+  'past_due',
+  'trialing',
+  'paused',
+] as const;
+
+export type SubscriptionStatusType = (typeof SUBSCRIPTION_STATUSES)[number];
+
+export const SUBSCRIPTION_STATUS_LABELS: Record<SubscriptionStatusType, string> = {
+  active: '활성',
+  canceled: '취소됨',
+  past_due: '연체',
+  trialing: '체험 중',
+  paused: '일시 중지',
+};
+
+// ===== 플랜 정보 =====
+
+export const PLAN_TYPES = ['starter', 'pro', 'team', 'enterprise'] as const;
+
+export type PlanType = (typeof PLAN_TYPES)[number];
+
+export const PLAN_LABELS: Record<PlanType, string> = {
+  starter: 'Starter (무료)',
+  pro: 'Pro',
+  team: 'Team',
+  enterprise: 'Enterprise',
+};
+
+export const PLAN_DAILY_LIMITS: Record<PlanType, number> = {
+  starter: 10,
+  pro: 100,
+  team: 500,
+  enterprise: 999999,
+};

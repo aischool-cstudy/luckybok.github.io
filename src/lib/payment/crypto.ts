@@ -5,26 +5,17 @@
  * - 주문 ID 생성
  */
 
-import { createCipheriv, createDecipheriv, createHmac, randomBytes } from 'crypto';
+import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from 'crypto';
+import { serverEnv } from '@/lib/env';
 
-// 환경 변수 검증
+// 환경 변수 접근 (env.ts 통해 타입 안전하게)
 function getEncryptionKey(): Buffer {
-  const key = process.env.BILLING_KEY_ENCRYPTION_KEY;
-  if (!key) {
-    throw new Error('BILLING_KEY_ENCRYPTION_KEY 환경 변수가 설정되지 않았습니다.');
-  }
-  if (key.length !== 32) {
-    throw new Error('BILLING_KEY_ENCRYPTION_KEY는 32자여야 합니다.');
-  }
+  const key = serverEnv.BILLING_KEY_ENCRYPTION_KEY;
   return Buffer.from(key, 'utf-8');
 }
 
 function getWebhookSecret(): string {
-  const secret = process.env.TOSS_WEBHOOK_SECRET;
-  if (!secret) {
-    throw new Error('TOSS_WEBHOOK_SECRET 환경 변수가 설정되지 않았습니다.');
-  }
-  return secret;
+  return serverEnv.TOSS_WEBHOOK_SECRET;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -93,28 +84,25 @@ export function decryptBillingKey(encryptedBillingKey: string): string {
 export function verifyWebhookSignature(payload: string, signature: string): boolean {
   const secret = getWebhookSecret();
 
-  const expectedSignature = createHmac('sha256', secret)
-    .update(payload)
-    .digest('base64');
+  const expectedSignature = createHmac('sha256', secret).update(payload).digest('base64');
 
-  // 타이밍 공격 방지를 위한 상수 시간 비교
-  if (signature.length !== expectedSignature.length) {
+  // Node.js 내장 timingSafeEqual을 사용한 타이밍 공격 방지
+  // Buffer 길이가 다르면 timingSafeEqual이 에러를 던지므로 먼저 검사
+  const signatureBuffer = Buffer.from(signature, 'utf-8');
+  const expectedBuffer = Buffer.from(expectedSignature, 'utf-8');
+
+  if (signatureBuffer.length !== expectedBuffer.length) {
     return false;
   }
 
-  let result = 0;
-  for (let i = 0; i < signature.length; i++) {
-    result |= signature.charCodeAt(i) ^ expectedSignature.charCodeAt(i);
-  }
-
-  return result === 0;
+  return timingSafeEqual(signatureBuffer, expectedBuffer);
 }
 
 // ────────────────────────────────────────────────────────────
 // 주문 ID 생성
 // ────────────────────────────────────────────────────────────
 
-type OrderIdPrefix = 'ORD' | 'SUB' | 'CRD';
+type OrderIdPrefix = 'ORD' | 'SUB' | 'CRD' | 'CHG';
 
 /**
  * 고유한 주문 ID 생성
@@ -145,7 +133,7 @@ export function generateOrderId(prefix: OrderIdPrefix = 'ORD'): string {
  * 주문 ID에서 타입 추출
  */
 export function getOrderIdType(orderId: string): OrderIdPrefix | null {
-  const match = orderId.match(/^(ORD|SUB|CRD)_/);
+  const match = orderId.match(/^(ORD|SUB|CRD|CHG)_/);
   return match ? (match[1] as OrderIdPrefix) : null;
 }
 

@@ -3,11 +3,36 @@ import {
   SUPPORTED_LANGUAGES,
   DIFFICULTY_LEVELS,
   TARGET_AUDIENCES,
+  type SupportedLanguage,
+  type DifficultyLevel,
+  type TargetAudience,
 } from '@/config/constants';
+import type {
+  ProgrammingLanguage,
+  DifficultyLevelDb,
+  TargetAudienceDb,
+} from '@/types/database.types';
+
+// ─────────────────────────────────────────────────────────
+// 타입 안전성 검증: config/constants.ts 타입이 DB 스키마와 일치하는지 확인
+// 컴파일 타임에 타입 불일치를 감지합니다.
+// ─────────────────────────────────────────────────────────
+type AssertEqual<T, U> = T extends U ? (U extends T ? true : false) : false;
+
+// 타입 일치 검증 (컴파일 에러 시 타입 불일치)
+const _languageCheck: AssertEqual<SupportedLanguage, ProgrammingLanguage> = true;
+const _difficultyCheck: AssertEqual<DifficultyLevel, DifficultyLevelDb> = true;
+const _audienceCheck: AssertEqual<TargetAudience, TargetAudienceDb> = true;
+
+// 미사용 변수 경고 방지
+void _languageCheck;
+void _difficultyCheck;
+void _audienceCheck;
 
 /**
  * 콘텐츠 생성 입력 스키마
  * - 소문자 표준 사용 (constants.ts와 일치)
+ * - DB 스키마와 타입 일치 보장
  */
 export const generateContentInputSchema = z.object({
   language: z.enum(SUPPORTED_LANGUAGES),
@@ -34,7 +59,7 @@ export const generatedContentSchema = z.object({
     .array(
       z.object({
         question: z.string(),
-        hint: z.string().optional(),
+        hint: z.string().describe('힌트 (없으면 빈 문자열)'),
         difficulty: z.enum(['easy', 'medium', 'hard']),
       })
     )

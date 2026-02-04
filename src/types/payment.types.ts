@@ -47,7 +47,7 @@ export type PaymentStatus =
   | 'refunded'
   | 'partial_refunded';
 
-export type PaymentType = 'subscription' | 'credit_purchase';
+export type PaymentType = 'subscription' | 'credit_purchase' | 'plan_change';
 
 export interface Payment {
   id: string;
@@ -66,13 +66,71 @@ export interface Payment {
   updatedAt: Date;
 }
 
-export interface PaymentMetadata {
+/**
+ * 결제 메타데이터 - Discriminated Union
+ * 결제 유형에 따라 필요한 필드가 다름
+ */
+export type PaymentMetadata =
+  | SubscriptionPaymentMetadata
+  | CreditPurchasePaymentMetadata
+  | PlanChangePaymentMetadata;
+
+/** 구독 결제 메타데이터 */
+export interface SubscriptionPaymentMetadata {
+  type: 'subscription';
+  planId: PlanType;
+  billingCycle: BillingCycle;
+  subscriptionId?: string;
+}
+
+/** 크레딧 구매 메타데이터 */
+export interface CreditPurchasePaymentMetadata {
+  type: 'credit_purchase';
+  creditPackageId: string;
+  credits: number;
+}
+
+/** 플랜 변경 메타데이터 */
+export interface PlanChangePaymentMetadata {
+  type: 'plan_change';
+  previousPlan: PlanType;
+  previousBillingCycle: BillingCycle;
+  newPlan: PlanType;
+  newBillingCycle: BillingCycle;
+  proratedAmount?: number;
+  subscriptionId?: string;
+}
+
+/**
+ * 레거시 호환성을 위한 타입 (점진적 마이그레이션용)
+ * @deprecated PaymentMetadata 사용 권장
+ */
+export interface PaymentMetadataLegacy {
   planId?: PlanType;
   billingCycle?: BillingCycle;
   creditPackageId?: string;
   credits?: number;
   subscriptionId?: string;
   [key: string]: unknown;
+}
+
+/** PaymentMetadata 타입 가드 */
+export function isSubscriptionMetadata(
+  metadata: PaymentMetadata
+): metadata is SubscriptionPaymentMetadata {
+  return metadata.type === 'subscription';
+}
+
+export function isCreditPurchaseMetadata(
+  metadata: PaymentMetadata
+): metadata is CreditPurchasePaymentMetadata {
+  return metadata.type === 'credit_purchase';
+}
+
+export function isPlanChangeMetadata(
+  metadata: PaymentMetadata
+): metadata is PlanChangePaymentMetadata {
+  return metadata.type === 'plan_change';
 }
 
 // ────────────────────────────────────────────────────────────
@@ -253,6 +311,65 @@ export interface CreditSummary {
   balance: number;
   expiringCredits: number;
   expiringDate: Date | null;
+}
+
+// ────────────────────────────────────────────────────────────
+// 플랜 변경 관련 타입
+// ────────────────────────────────────────────────────────────
+
+export type PlanChangeType = 'upgrade' | 'downgrade' | 'same' | 'cycle_change';
+
+export interface PreparePlanChangeResponse {
+  /** 변경 유형 */
+  changeType: PlanChangeType;
+  /** 현재 플랜 */
+  currentPlan: PlanType;
+  /** 현재 결제 주기 */
+  currentBillingCycle: BillingCycle;
+  /** 새 플랜 */
+  newPlan: PlanType;
+  /** 새 결제 주기 */
+  newBillingCycle: BillingCycle;
+  /** 비례 배분 금액 (업그레이드 시 추가 결제 금액) */
+  proratedAmount: number;
+  /** 새 플랜 전체 금액 */
+  newPlanAmount: number;
+  /** 적용 일자 */
+  effectiveDate: Date;
+  /** 결제 필요 여부 */
+  requiresPayment: boolean;
+  /** 주문 ID (결제 필요 시) */
+  orderId?: string;
+  /** 주문명 (결제 필요 시) */
+  orderName?: string;
+  /** 고객 키 (결제 필요 시) */
+  customerKey?: string;
+  /** 남은 일수 */
+  daysRemaining: number;
+  /** 변경 요약 메시지 */
+  summary: string;
+}
+
+export interface ScheduledPlanChange {
+  /** 예약 변경 여부 */
+  hasScheduledChange: boolean;
+  /** 현재 플랜 */
+  currentPlan: PlanType;
+  /** 현재 결제 주기 */
+  currentBillingCycle: BillingCycle;
+  /** 예약된 새 플랜 */
+  scheduledPlan: PlanType | null;
+  /** 예약된 새 결제 주기 */
+  scheduledBillingCycle: BillingCycle | null;
+  /** 변경 예정 일시 */
+  scheduledChangeAt: Date | null;
+}
+
+export interface SubscriptionSummaryExtended extends SubscriptionSummary {
+  /** 결제 주기 */
+  billingCycle: BillingCycle;
+  /** 예약된 플랜 변경 */
+  scheduledChange?: ScheduledPlanChange;
 }
 
 // ────────────────────────────────────────────────────────────
