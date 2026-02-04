@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { Button, Card, CardContent, CardHeader, CardTitle } from '@/components/ui';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import Link from 'next/link';
+import { captureError } from '@/lib/client-logger';
 
 export default function GenerateError({
   error,
@@ -13,8 +14,11 @@ export default function GenerateError({
   reset: () => void;
 }) {
   useEffect(() => {
-    // 에러 로깅 (프로덕션에서는 Sentry 등으로 전송)
-    console.error('콘텐츠 생성 페이지 에러:', error);
+    // Sentry로 에러 전송
+    captureError(error, {
+      component: 'GeneratePage',
+      action: 'load',
+    });
   }, [error]);
 
   return (
