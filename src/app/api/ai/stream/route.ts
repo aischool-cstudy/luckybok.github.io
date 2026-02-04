@@ -1,9 +1,12 @@
 import { streamText } from 'ai';
-import { anthropic } from '@ai-sdk/anthropic';
 import { createServerClient } from '@/lib/supabase/server';
 import { CONTENT_SYSTEM_PROMPT, createContentPrompt } from '@/lib/ai/prompts';
 import { generateContentInputSchema } from '@/lib/ai/schemas';
+import { models } from '@/lib/ai/providers';
+import { logError } from '@/lib/logger';
 
+// API 라우트 설정: 스트리밍 응답은 캐싱 불가
+export const revalidate = 0;
 export const maxDuration = 60; // 최대 60초
 
 export async function POST(request: Request) {
@@ -65,27 +68,58 @@ export async function POST(request: Request) {
       targetAudience: validated.data.targetAudience,
     });
 
-    // AI 스트리밍 응답 생성
+    // AI 스트리밍 응답 생성 (Groq 무료 티어 사용)
     const result = streamText({
-      model: anthropic('claude-sonnet-4-20250514'),
+      model: models.standard,
       system: CONTENT_SYSTEM_PROMPT,
       prompt,
-      maxTokens: 4000,
+      maxOutputTokens: 4000,
       temperature: 0.7,
       onFinish: async () => {
-        // 생성 횟수 차감
-        await supabase
-          .from('profiles')
-          .update({
-            daily_generations_remaining: profile.daily_generations_remaining - 1,
-          })
-          .eq('id', user.id);
+        // 생성 횟수 차감 (재시도 로직 포함)
+        const maxRetries = 3;
+        let lastError: unknown = null;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+          const { error } = await supabase
+            .from('profiles')
+            .update({
+              daily_generations_remaining: profile.daily_generations_remaining - 1,
+            })
+            .eq('id', user.id);
+
+          if (!error) {
+            return; // 성공
+          }
+
+          lastError = error;
+          logError('생성 횟수 차감 실패', error, {
+            action: 'ai/stream/onFinish',
+            userId: user.id,
+            attempt,
+            maxRetries,
+          });
+
+          // 재시도 전 대기 (지수 백오프)
+          if (attempt < maxRetries) {
+            await new Promise((resolve) => setTimeout(resolve, 100 * Math.pow(2, attempt)));
+          }
+        }
+
+        // 모든 재시도 실패 시 로깅
+        logError('생성 횟수 차감 최종 실패', lastError, {
+          action: 'ai/stream/onFinish',
+          userId: user.id,
+          critical: true,
+        });
       },
     });
 
-    return result.toDataStreamResponse();
+    return result.toTextStreamResponse();
   } catch (error) {
-    console.error('AI 스트리밍 오류:', error);
+    logError('AI 스트리밍 오류', error, {
+      action: 'ai/stream',
+    });
     return Response.json(
       { error: 'AI 콘텐츠 생성 중 오류가 발생했습니다.' },
       { status: 500 }

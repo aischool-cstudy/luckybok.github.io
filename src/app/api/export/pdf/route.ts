@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { exportContentToPDF } from '@/actions/export';
 
-// Note: Next.js 16 cacheComponents와 호환을 위해 runtime/dynamic 제거
-// API 라우트는 기본적으로 동적임
+// API 라우트 설정: PDF 생성은 동적 처리 필요
+export const revalidate = 0;
+export const maxDuration = 30; // PDF 생성 최대 30초
 
 /**
  * PDF 내보내기 API 엔드포인트
