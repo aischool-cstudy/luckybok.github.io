@@ -40,15 +40,24 @@ export function DeleteButton({
 
   if (showConfirm) {
     return (
-      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-        <span className="text-xs text-muted-foreground">삭제할까요?</span>
+      <div
+        className="flex items-center gap-2"
+        onClick={(e) => e.stopPropagation()}
+        role="alertdialog"
+        aria-label="삭제 확인"
+        aria-describedby="delete-confirm-text"
+      >
+        <span id="delete-confirm-text" className="text-xs text-muted-foreground">
+          삭제할까요?
+        </span>
         <Button
           size="sm"
           variant="destructive"
           onClick={handleDelete}
           disabled={isPending}
+          aria-busy={isPending}
         >
-          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : '확인'}
+          {isPending ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" /> : '확인'}
         </Button>
         <Button
           size="sm"
@@ -65,15 +74,24 @@ export function DeleteButton({
   if (variant === 'icon') {
     return (
       <button
+        type="button"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
           setShowConfirm(true);
         }}
-        className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            e.stopPropagation();
+            setShowConfirm(true);
+          }
+        }}
+        className="rounded-md p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2"
         aria-label="삭제"
+        aria-haspopup="dialog"
       >
-        <Trash2 className="h-4 w-4" />
+        <Trash2 className="h-4 w-4" aria-hidden="true" />
       </button>
     );
   }

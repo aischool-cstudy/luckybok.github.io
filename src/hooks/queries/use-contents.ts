@@ -15,24 +15,28 @@ export const contentKeys = {
 
 /**
  * 생성 히스토리 조회 훅
+ * staleTime: 5분 - 히스토리 데이터는 자주 변경되지 않음
  */
 export function useGenerationHistory(page = 1, limit = 10) {
   return useQuery({
     queryKey: contentKeys.history(page, limit),
     queryFn: () => getGenerationHistory(page, limit),
-    staleTime: 30 * 1000, // 30초
+    staleTime: 5 * 60 * 1000, // 5분
+    refetchOnWindowFocus: false,
   });
 }
 
 /**
  * 남은 생성 횟수 조회 훅
+ * staleTime: 1분 - 생성 전 확인용
+ * refetchOnWindowFocus: false - mutation 성공 시 invalidate로 갱신
  */
 export function useRemainingGenerations() {
   return useQuery({
     queryKey: contentKeys.remaining,
     queryFn: () => getRemainingGenerations(),
-    staleTime: 10 * 1000, // 10초
-    refetchOnWindowFocus: true,
+    staleTime: 60 * 1000, // 1분
+    refetchOnWindowFocus: false,
   });
 }
 

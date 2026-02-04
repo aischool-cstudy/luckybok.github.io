@@ -45,4 +45,9 @@ function Badge({
   )
 }
 
+// BadgeProps 타입 정의
+type BadgeProps = React.ComponentProps<"span"> &
+  VariantProps<typeof badgeVariants> & { asChild?: boolean }
+
 export { Badge, badgeVariants }
+export type { BadgeProps }

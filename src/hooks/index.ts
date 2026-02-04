@@ -5,4 +5,5 @@ export * from './queries';
 export { useTossPayments } from './use-toss-payments';
 
 // UI Hooks
-export { useToast, toast } from './use-toast';
+export { useToast } from './use-toast';
+export type { Toast } from './use-toast';

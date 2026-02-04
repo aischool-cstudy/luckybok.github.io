@@ -4,6 +4,7 @@
  */
 
 import { useState, useCallback } from 'react';
+import { clientLogger } from '@/lib/client-logger';
 
 export interface Toast {
   id: string;
@@ -38,11 +39,11 @@ export function useToast() {
         toasts: [...prev.toasts, { id, title, description, variant }],
       }));
 
-      // 콘솔에 로그 (디버깅용)
+      // 로그 기록 (디버깅용)
       if (variant === 'destructive') {
-        console.error(`[Toast] ${title}: ${description}`);
+        clientLogger.error(`[Toast] ${title}`, undefined, { description });
       } else {
-        console.log(`[Toast] ${title}: ${description}`);
+        clientLogger.info(`[Toast] ${title}`, { description });
       }
 
       // 3초 후 자동 제거

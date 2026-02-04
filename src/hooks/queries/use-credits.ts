@@ -13,36 +13,42 @@ export const creditKeys = {
 
 /**
  * 크레딧 잔액 조회 훅
+ * staleTime: 5분 - 크레딧 변경은 빈번하지 않음
+ * refetchOnWindowFocus: false - 불필요한 API 요청 방지
  */
 export function useCreditBalance() {
   return useQuery({
     queryKey: creditKeys.balance(),
     queryFn: () => getCreditBalance(),
-    staleTime: 10 * 1000, // 10초
-    refetchOnWindowFocus: true,
+    staleTime: 5 * 60 * 1000, // 5분
+    refetchOnWindowFocus: false,
   });
 }
 
 /**
  * 크레딧 히스토리 조회 훅
+ * staleTime: 5분 - 히스토리 데이터는 자주 변경되지 않음
  */
 export function useCreditHistory(page = 1, limit = 10) {
   return useQuery({
     queryKey: creditKeys.history(page, limit),
     queryFn: () => getCreditHistory(page, limit),
-    staleTime: 30 * 1000, // 30초
+    staleTime: 5 * 60 * 1000, // 5분
+    refetchOnWindowFocus: false,
   });
 }
 
 /**
  * 생성 가능 여부 조회 훅
+ * staleTime: 1분 - 생성 전 확인용이므로 적당한 캐싱
+ * refetchOnWindowFocus: false - 실제 생성 시점에 서버에서 재확인
  */
 export function useGenerationAvailability() {
   return useQuery({
     queryKey: creditKeys.availability(),
     queryFn: () => checkGenerationAvailability(),
-    staleTime: 10 * 1000, // 10초
-    refetchOnWindowFocus: true,
+    staleTime: 60 * 1000, // 1분
+    refetchOnWindowFocus: false,
   });
 }
 

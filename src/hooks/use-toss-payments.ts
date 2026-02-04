@@ -2,6 +2,7 @@
  * 토스페이먼츠 SDK 커스텀 훅
  *
  * SDK 로드 및 결제/빌링 인증 기능 제공
+ * Zustand 스토어와 연동하여 SDK 상태를 전역 동기화
  */
 
 'use client';
@@ -13,6 +14,8 @@ import type {
   TossBillingAuthOptions,
   TossPaymentsConstructor,
 } from '@/types/payment.types';
+import { clientEnv } from '@/lib/env';
+import { usePaymentStore } from '@/stores';
 
 const TOSS_SDK_URL = 'https://js.tosspayments.com/v1/payment';
 
@@ -71,7 +74,10 @@ export function useTossPayments(
   const [error, setError] = useState<Error | null>(null);
   const [tossInstance, setTossInstance] = useState<TossPaymentsInstance | null>(null);
 
-  const clientKey = process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY;
+  // Zustand 스토어와 SDK 준비 상태 동기화
+  const { setSdkReady } = usePaymentStore();
+
+  const clientKey = clientEnv.TOSS_CLIENT_KEY;
 
   const loadSDK = useCallback(async () => {
     // 이미 로드되었거나 로드 중인 경우 스킵
@@ -159,6 +165,11 @@ export function useTossPayments(
       loadSDK();
     }
   }, [autoLoad, isReady, isLoading, loadSDK]);
+
+  // Zustand 스토어와 SDK 상태 동기화
+  useEffect(() => {
+    setSdkReady(isReady);
+  }, [isReady, setSdkReady]);
 
   const requestPayment = useCallback(
     async (paymentOptions: TossPaymentRequestOptions) => {

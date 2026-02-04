@@ -2,6 +2,8 @@
 
 /**
  * 결제 이력 테이블 컴포넌트
+ *
+ * 상태 표시에 config/constants.ts의 중앙 관리 상수를 사용합니다.
  */
 
 import { ExternalLink } from 'lucide-react';
@@ -13,24 +15,16 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { PaymentStatusBadge } from '@/components/ui/status-badge';
 import { formatPrice } from '@/config/pricing';
 import type { PaymentHistoryItem } from '@/types/payment.types';
+import type { PaymentStatusType } from '@/config/constants';
 
 interface PaymentHistoryTableProps {
   items: PaymentHistoryItem[];
   isLoading?: boolean;
 }
-
-const statusLabels: Record<string, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
-  pending: { label: '대기 중', variant: 'secondary' },
-  completed: { label: '완료', variant: 'default' },
-  failed: { label: '실패', variant: 'destructive' },
-  canceled: { label: '취소', variant: 'outline' },
-  refunded: { label: '환불', variant: 'outline' },
-  partial_refunded: { label: '부분 환불', variant: 'outline' },
-};
 
 export function PaymentHistoryTable({
   items,
@@ -64,13 +58,7 @@ export function PaymentHistoryTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {items.map((item) => {
-          const status = statusLabels[item.status] || {
-            label: item.status,
-            variant: 'secondary' as const,
-          };
-
-          return (
+        {items.map((item) => (
             <TableRow key={item.id}>
               <TableCell>
                 {new Date(item.date).toLocaleDateString('ko-KR', {
@@ -82,7 +70,7 @@ export function PaymentHistoryTable({
               <TableCell>{item.description}</TableCell>
               <TableCell>{formatPrice(item.amount)}</TableCell>
               <TableCell>
-                <Badge variant={status.variant}>{status.label}</Badge>
+                <PaymentStatusBadge status={item.status as PaymentStatusType} />
               </TableCell>
               <TableCell className="text-right">
                 {item.receiptUrl ? (
@@ -100,8 +88,7 @@ export function PaymentHistoryTable({
                 )}
               </TableCell>
             </TableRow>
-          );
-        })}
+          ))}
       </TableBody>
     </Table>
   );
