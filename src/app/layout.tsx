@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono } from 'next/font/google';
+import { Analytics } from '@vercel/analytics/react';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import { siteConfig } from '@/config/site';
 import { Providers } from './providers';
+import { SkipLink } from '@/components/layout';
 import './globals.css';
 
 const geistSans = Geist({
@@ -59,7 +62,17 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} min-h-screen bg-background font-sans antialiased`}
       >
-        <Providers>{children}</Providers>
+        {/* 접근성: 키보드 사용자를 위한 건너뛰기 링크 */}
+        <SkipLink />
+        <Providers>
+          <main id="main-content" tabIndex={-1}>
+            {children}
+          </main>
+        </Providers>
+        {/* Vercel Analytics - 사용자 행동 분석 */}
+        <Analytics />
+        {/* Vercel Speed Insights - Core Web Vitals 모니터링 */}
+        <SpeedInsights />
       </body>
     </html>
   );
