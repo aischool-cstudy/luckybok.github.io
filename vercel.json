@@ -1,0 +1,25 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "functions": {
+    "src/app/api/**/*.ts": {
+      "maxDuration": 60
+    },
+    "src/actions/**/*.ts": {
+      "maxDuration": 60
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/reset-daily-limits",
+      "schedule": "0 0 * * *"
+    },
+    {
+      "path": "/api/cron/renew-subscriptions",
+      "schedule": "0 */6 * * *"
+    },
+    {
+      "path": "/api/cron/expire-credits",
+      "schedule": "0 1 * * *"
+    }
+  ]
+}

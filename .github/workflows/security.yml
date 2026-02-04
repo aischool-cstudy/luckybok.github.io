@@ -1,0 +1,167 @@
+name: Security Audit
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # 매일 오전 9시 (KST) 실행
+    - cron: '0 0 * * *'
+  workflow_dispatch: # 수동 실행 가능
+
+permissions:
+  contents: read
+  security-events: write
+
+env:
+  NODE_VERSION: '20'
+
+jobs:
+  # ================================
+  # npm audit - 의존성 보안 검사
+  # ================================
+  npm-audit:
+    name: NPM Security Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 개발 의존성 포함 - high 이상 취약점 검사
+      - name: Audit all dependencies
+        run: npm audit --audit-level=high
+        continue-on-error: true
+
+      # 프로덕션 의존성만 - critical 취약점 검사 (실패시 CI 실패)
+      - name: Audit production dependencies (strict)
+        run: npm audit --omit=dev --audit-level=critical
+
+      # 감사 보고서 생성
+      - name: Generate audit report
+        if: always()
+        run: |
+          echo "## NPM Audit Report" > audit-report.md
+          echo "" >> audit-report.md
+          echo "### All Dependencies" >> audit-report.md
+          echo '```' >> audit-report.md
+          npm audit --json 2>/dev/null | head -100 >> audit-report.md || echo "No audit data" >> audit-report.md
+          echo '```' >> audit-report.md
+
+      - name: Upload audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-audit-report
+          path: audit-report.md
+          retention-days: 30
+
+  # ================================
+  # 환경변수 스키마 검증
+  # ================================
+  env-validation:
+    name: Environment Variable Schema Validation
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 개발 환경 검증 (필수 환경변수 형식 확인만)
+      - name: Validate env schema (development)
+        run: npx tsx scripts/validate-env-schema.ts
+        continue-on-error: true
+        env:
+          # 최소한의 더미 값으로 스키마 형식 검증
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'dummy-key-for-schema-validation' }}
+          NEXT_PUBLIC_TOSS_CLIENT_KEY: test_ck_dummy1234567890
+          TOSS_SECRET_KEY: test_sk_dummy1234567890
+          TOSS_WEBHOOK_SECRET: test-webhook-secret
+          BILLING_KEY_ENCRYPTION_KEY: 12345678901234567890123456789012
+          ANTHROPIC_API_KEY: sk-ant-dummy-key-for-validation
+
+  # ================================
+  # CodeQL 분석 (선택적)
+  # ================================
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # 보안 쿼리 사용
+          queries: security-extended
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v3
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: "/language:javascript-typescript"
+
+  # ================================
+  # 시크릿 스캔 (gitleaks)
+  # ================================
+  secret-scan:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 전체 히스토리 필요
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Gitleaks 설정 (선택적)
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  # ================================
+  # 보안 요약 보고
+  # ================================
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [npm-audit, env-validation, secret-scan]
+    if: always()
+    steps:
+      - name: Check results
+        run: |
+          echo "## Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| NPM Audit | ${{ needs.npm-audit.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Env Validation | ${{ needs.env-validation.result == 'success' && '✅ Passed' || '⚠️ Warning' }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Scan | ${{ needs.secret-scan.result == 'success' && '✅ Passed' || '❌ Failed' }} |" >> $GITHUB_STEP_SUMMARY
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Generated at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY

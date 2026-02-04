@@ -1,0 +1,119 @@
+# Dependabot 자동 의존성 업데이트 설정
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+version: 2
+updates:
+  # npm 패키지 업데이트
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Seoul"
+
+    # PR 제목 형식
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+
+    # 오픈할 수 있는 최대 PR 수
+    open-pull-requests-limit: 10
+
+    # 리뷰어 자동 할당
+    # reviewers:
+    #   - "your-github-username"
+
+    # 라벨 자동 추가
+    labels:
+      - "dependencies"
+      - "automated"
+
+    # minor/patch 업데이트 그룹화
+    groups:
+      # 개발 의존성 그룹
+      dev-dependencies:
+        dependency-type: "development"
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+
+      # Next.js 생태계 그룹
+      nextjs:
+        patterns:
+          - "next"
+          - "next-*"
+          - "@next/*"
+        update-types:
+          - "minor"
+          - "patch"
+
+      # React 생태계 그룹
+      react:
+        patterns:
+          - "react"
+          - "react-dom"
+          - "@types/react"
+          - "@types/react-dom"
+        update-types:
+          - "minor"
+          - "patch"
+
+      # 린트/포맷터 그룹
+      linters:
+        patterns:
+          - "eslint"
+          - "eslint-*"
+          - "@eslint/*"
+          - "prettier"
+          - "@typescript-eslint/*"
+        update-types:
+          - "minor"
+          - "patch"
+
+      # 테스트 도구 그룹
+      testing:
+        patterns:
+          - "vitest"
+          - "@vitest/*"
+          - "playwright"
+          - "@playwright/*"
+        update-types:
+          - "minor"
+          - "patch"
+
+      # AI SDK 그룹
+      ai-sdk:
+        patterns:
+          - "ai"
+          - "@ai-sdk/*"
+          - "@anthropic-ai/*"
+          - "openai"
+        update-types:
+          - "minor"
+          - "patch"
+
+    # 특정 패키지 무시 (필요시 활성화)
+    # ignore:
+    #   - dependency-name: "some-package"
+    #     versions: [">=2.0.0"]
+
+  # GitHub Actions 업데이트
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    commit-message:
+      prefix: "ci(deps)"
+    labels:
+      - "dependencies"
+      - "ci"
+    groups:
+      actions:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"

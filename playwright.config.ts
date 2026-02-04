@@ -1,4 +1,27 @@
 import { defineConfig, devices } from '@playwright/test';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
+// .env.local 환경변수 로드
+function loadEnvFile(filePath: string) {
+  try {
+    const content = readFileSync(resolve(process.cwd(), filePath), 'utf-8');
+    content.split('\n').forEach((line) => {
+      const trimmed = line.trim();
+      if (trimmed && !trimmed.startsWith('#')) {
+        const [key, ...valueParts] = trimmed.split('=');
+        const value = valueParts.join('=');
+        if (key && value && !process.env[key]) {
+          process.env[key] = value;
+        }
+      }
+    });
+  } catch {
+    // 파일이 없으면 무시
+  }
+}
+
+loadEnvFile('.env.local');
 
 export default defineConfig({
   testDir: './tests/e2e',
