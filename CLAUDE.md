@@ -81,6 +81,7 @@ SuperClaude 플래그 활용:
 8. [Payment System (TossPayments)](#payment-system-tosspayments)
 9. [Security Guidelines](#security-guidelines)
 10. [Troubleshooting](#troubleshooting)
+11. [Multi-Terminal Session Strategy](#multi-terminal-session-strategy-병렬-작업-전략)
 
 ---
 
@@ -820,6 +821,269 @@ npm run db:reset         # DB 리셋
 
 ---
 
+## Multi-Terminal Session Strategy (병렬 작업 전략)
+
+CodeGen AI 프로젝트를 효율적으로 진행하기 위한 멀티 터미널 세션 가이드입니다. 각 세션에 전문가 페르소나를 할당하여 병렬 작업으로 개발 속도를 극대화합니다.
+
+### Session Architecture (세션 구조)
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    CodeGen AI 병렬 개발 터미널 구조                        │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  [Terminal 1: Frontend]     [Terminal 2: Backend]                       │
+│  ├─ Persona: frontend       ├─ Persona: backend                         │
+│  ├─ 담당: UI/UX, 컴포넌트     ├─ 담당: Server Actions, API               │
+│  ├─ MCP: Magic, Playwright   ├─ MCP: Context7, Sequential               │
+│  └─ 포트: 3000 (dev)         └─ 포트: N/A (Server Actions)              │
+│                                                                         │
+│  [Terminal 3: QA/Test]      [Terminal 4: DevOps/DB]                     │
+│  ├─ Persona: qa             ├─ Persona: devops                          │
+│  ├─ 담당: 테스트, 품질 검증    ├─ 담당: DB 마이그레이션, 배포             │
+│  ├─ MCP: Playwright, Seq     ├─ MCP: Sequential, Context7               │
+│  └─ 실행: vitest, playwright └─ 실행: supabase, vercel                  │
+│                                                                         │
+│  [Terminal 5: AI/Content]   [Terminal 6: Architect] (필요시)            │
+│  ├─ Persona: analyzer       ├─ Persona: architect                       │
+│  ├─ 담당: AI 프롬프트, 콘텐츠  ├─ 담당: 설계, 리팩토링, 코드 리뷰          │
+│  ├─ MCP: Sequential, C7      ├─ MCP: All (--ultrathink)                 │
+│  └─ 작업: 프롬프트 엔지니어링   └─ 작업: 아키텍처 결정, PR 리뷰            │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Terminal Session Definitions (세션 정의)
+
+#### Terminal 1: Frontend Session (프론트엔드)
+
+```yaml
+Session Name: "CodeGen-Frontend"
+Persona: --persona-frontend
+MCP Servers: --magic --play
+Focus Areas:
+  - src/components/         # UI 컴포넌트
+  - src/app/(marketing)/    # 랜딩, 가격 페이지
+  - src/app/(auth)/         # 로그인, 회원가입
+  - src/app/(protected)/    # 대시보드, 생성 페이지
+  - src/styles/             # 전역 스타일
+
+Recommended Commands:
+  sc:implement --type component   # 컴포넌트 구현
+  sc:build --focus ui             # UI 빌드 검증
+  sc:improve --focus accessibility # 접근성 개선
+
+Initial Prompt:
+  "나는 CodeGen AI의 프론트엔드 전문가입니다.
+   React 19 + Next.js 16 App Router를 사용합니다.
+   shadcn/ui + Tailwind CSS로 UI를 구현합니다.
+   RSC 우선, 필요시에만 'use client' 사용합니다."
+```
+
+#### Terminal 2: Backend Session (백엔드)
+
+```yaml
+Session Name: "CodeGen-Backend"
+Persona: --persona-backend
+MCP Servers: --c7 --seq
+Focus Areas:
+  - src/actions/            # Server Actions
+  - src/lib/supabase/       # Supabase 클라이언트
+  - src/lib/payment/        # 결제 로직
+  - src/app/api/            # API Routes (웹훅)
+  - src/lib/validators/     # Zod 스키마
+
+Recommended Commands:
+  sc:implement --type api         # API 구현
+  sc:analyze --focus security     # 보안 분석
+  sc:improve --focus reliability  # 안정성 개선
+
+Initial Prompt:
+  "나는 CodeGen AI의 백엔드 전문가입니다.
+   Server Actions 우선, API Route는 웹훅용으로만 사용합니다.
+   Supabase (PostgreSQL + Auth)를 사용합니다.
+   모든 입력은 Zod로 검증하고, 결제는 서버 사이드 검증 필수입니다."
+```
+
+#### Terminal 3: QA/Test Session (품질 보증)
+
+```yaml
+Session Name: "CodeGen-QA"
+Persona: --persona-qa
+MCP Servers: --play --seq
+Focus Areas:
+  - tests/unit/             # 단위 테스트
+  - tests/e2e/              # E2E 테스트
+  - tests/__mocks__/        # 목 데이터
+  - playwright.config.ts
+  - vitest.config.ts
+
+Recommended Commands:
+  sc:test --type unit             # 단위 테스트
+  sc:test --type e2e              # E2E 테스트
+  sc:analyze --focus quality      # 코드 품질 분석
+
+Initial Prompt:
+  "나는 CodeGen AI의 QA 전문가입니다.
+   Vitest로 단위 테스트, Playwright로 E2E 테스트를 작성합니다.
+   커버리지 목표: 단위 80%, 통합 70%입니다.
+   결제 플로우와 인증 플로우는 반드시 E2E 테스트가 필요합니다."
+```
+
+#### Terminal 4: DevOps/DB Session (인프라)
+
+```yaml
+Session Name: "CodeGen-DevOps"
+Persona: --persona-devops
+MCP Servers: --seq --c7
+Focus Areas:
+  - supabase/migrations/    # DB 마이그레이션
+  - .github/workflows/      # CI/CD
+  - vercel.json             # Vercel 설정
+  - .env.example            # 환경변수
+
+Recommended Commands:
+  sc:build --focus deploy         # 배포 빌드
+  sc:analyze --focus infra        # 인프라 분석
+  sc:troubleshoot                 # 문제 진단
+
+Initial Prompt:
+  "나는 CodeGen AI의 DevOps 전문가입니다.
+   Supabase 마이그레이션과 Vercel 배포를 담당합니다.
+   GitHub Actions로 CI/CD를 관리합니다.
+   환경변수 관리와 시크릿 보안에 주의합니다."
+```
+
+#### Terminal 5: AI/Content Session (AI 콘텐츠)
+
+```yaml
+Session Name: "CodeGen-AI"
+Persona: --persona-analyzer
+MCP Servers: --seq --c7
+Focus Areas:
+  - src/lib/ai/             # AI 프로바이더, 스키마
+  - src/actions/generate.ts # 콘텐츠 생성 액션
+  - src/app/api/ai/         # AI 스트리밍 API
+
+Recommended Commands:
+  sc:analyze --think-hard         # 심층 분석
+  sc:implement --type service     # AI 서비스 구현
+  sc:improve --focus performance  # 성능 최적화
+
+Initial Prompt:
+  "나는 CodeGen AI의 AI 콘텐츠 전문가입니다.
+   Vercel AI SDK 4.x로 스트리밍 응답을 구현합니다.
+   Claude (claude-sonnet-4) 우선, OpenAI (gpt-4o-mini) 폴백입니다.
+   프롬프트 엔지니어링과 토큰 최적화를 담당합니다."
+```
+
+### Parallel Workflow Examples (병렬 작업 예시)
+
+#### Example 1: 새 기능 개발 (결제 기능)
+
+```yaml
+Phase 1 - 설계 (Architect 세션):
+  Terminal: 6
+  Command: "sc:design --ultrathink 결제 기능 설계"
+  Output: 설계 문서, 시퀀스 다이어그램
+
+Phase 2 - 병렬 구현:
+  Terminal 2 (Backend):
+    - "결제 Server Action 구현 (src/actions/payment.ts)"
+    - "토스페이먼츠 클라이언트 구현"
+
+  Terminal 1 (Frontend):
+    - "결제 UI 컴포넌트 구현"
+    - "결제 폼, 성공/실패 페이지"
+
+  Terminal 4 (DevOps):
+    - "결제 테이블 마이그레이션"
+    - "웹훅 엔드포인트 설정"
+
+Phase 3 - 테스트:
+  Terminal 3 (QA):
+    - "결제 플로우 E2E 테스트"
+    - "웹훅 처리 단위 테스트"
+```
+
+#### Example 2: 버그 수정 (긴급)
+
+```yaml
+Terminal 3 (QA):
+  1. 버그 재현 및 테스트 케이스 작성
+  2. 실패 테스트 확인
+
+Terminal 2 (Backend) 또는 Terminal 1 (Frontend):
+  1. 버그 원인 분석
+  2. 수정 구현
+
+Terminal 3 (QA):
+  1. 수정 검증
+  2. 회귀 테스트 실행
+```
+
+### Session Communication Protocol (세션 간 소통)
+
+```yaml
+작업 분배:
+  - TaskCreate로 각 세션에 작업 할당
+  - TaskUpdate로 진행 상황 공유
+  - 의존성 있는 작업은 blockedBy 설정
+
+파일 충돌 방지:
+  - 각 세션은 담당 영역만 수정
+  - 공유 파일 (types/, lib/) 수정 시 사전 조율
+  - Git 브랜치: feature/{session}-{feature-name}
+
+동기화 포인트:
+  - 타입 변경 시 모든 세션에 알림
+  - DB 스키마 변경 시 DevOps 세션 우선 작업
+  - API 계약 변경 시 Backend → Frontend 순서
+```
+
+### Session Startup Commands (세션 시작 명령)
+
+```bash
+# Terminal 1: Frontend
+claude --persona-frontend --magic --play
+
+# Terminal 2: Backend
+claude --persona-backend --c7 --seq
+
+# Terminal 3: QA
+claude --persona-qa --play --seq
+
+# Terminal 4: DevOps
+claude --persona-devops --seq --c7
+
+# Terminal 5: AI/Content
+claude --persona-analyzer --seq --c7 --think
+
+# Terminal 6: Architect (필요시)
+claude --persona-architect --all-mcp --ultrathink
+```
+
+### Best Practices (모범 사례)
+
+```yaml
+DO:
+  ✅ 각 세션의 담당 영역 명확히 구분
+  ✅ 공유 타입/스키마 변경 시 모든 세션에 알림
+  ✅ 병렬 작업 가능한 독립 작업 먼저 식별
+  ✅ TaskCreate로 작업 추적 및 의존성 관리
+  ✅ 정기적으로 git pull로 동기화
+  ✅ 복잡한 기능은 Architect 세션에서 설계 후 분배
+
+DON'T:
+  ❌ 여러 세션에서 동일 파일 동시 수정
+  ❌ 타입 정의 없이 구현 시작
+  ❌ 테스트 없이 기능 완료 선언
+  ❌ DevOps 승인 없이 DB 스키마 변경
+  ❌ 세션 간 직접 의존성 생성 (인터페이스 통해 소통)
+```
+
+---
+
 ## Development Roadmap
 
 ```
@@ -845,5 +1109,6 @@ Phase 3 (Week 9-12): Polish
 ---
 
 > **Version History**
+> - v1.2.0 (2026-02-03): 멀티 터미널 세션 전략 추가 (병렬 작업 가이드)
 > - v1.1.0 (2026-01-28): Supabase 기술 스택 반영, 콘텐츠 생성 기능 구현
 > - v1.0.0 (2026-01-28): CodeGen AI 프로젝트용 초기 버전
